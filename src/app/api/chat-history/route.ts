@@ -15,12 +15,16 @@ interface ChatMessage {
 }
 
 // Configuración de la base de datos
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-});
+const pool = process.env.DATABASE_URL ? new Pool({
+  connectionString: process.env.DATABASE_URL,
+}) : null;
+
+let isInitialized = false;
 
 // Función para inicializar la tabla de chat_messages si no existe
 async function initializeChatTable() {
+  if (!pool || isInitialized) return;
+  
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS chat_messages (
@@ -41,15 +45,21 @@ async function initializeChatTable() {
       CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
       CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_type ON chat_messages(chat_type);
     `);
+    
+    isInitialized = true;
   } catch (error) {
     console.error('Error initializing chat table:', error);
   }
 }
 
-// Inicializar la tabla al cargar el módulo
-initializeChatTable();
-
 export async function GET(request: NextRequest) {
+  if (!pool) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+
+  // Ensure table is initialized lazily
+  await initializeChatTable();
+
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     const userId = session?.user?.id || 'guest';
@@ -146,6 +156,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!pool) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+
+  // Ensure table is initialized lazily
+  await initializeChatTable();
+
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     const { chatType, sessionId, role, content, contextData } = await request.json();
@@ -197,6 +214,10 @@ export async function POST(request: NextRequest) {
 
 // Endpoint para limpiar historial de una sesión específica
 export async function DELETE(request: NextRequest) {
+  if (!pool) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     const userId = session?.user?.id || 'guest';
