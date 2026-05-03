@@ -35,8 +35,9 @@ let _genai: GoogleGenAI | null = null;
 
 function getGenAIClient(): GoogleGenAI {
   if (!_genai) {
+    const apiKey = process.env.GOOGLE_API_KEY;
     const project = process.env.GOOGLE_CLOUD_PROJECT;
-    if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set');
+    if (!apiKey && !project) throw new Error('GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT is not set');
     
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
 
@@ -51,13 +52,19 @@ function getGenAIClient(): GoogleGenAI {
       process.env.GOOGLE_APPLICATION_CREDENTIALS = tempKeyPath;
     }
 
-    // Para desarrollo local, usará automáticamente tus credenciales de 'gcloud auth application-default login'
-    // En Vercel, usará el archivo que acabamos de crear en /tmp.
-    _genai = new GoogleGenAI({ 
-      vertexai: true,
-      project: project,
-      location: location
-    });
+    if (apiKey) {
+      _genai = new GoogleGenAI({
+        vertexai: true,
+        apiKey,
+        location,
+      });
+    } else {
+      _genai = new GoogleGenAI({ 
+        vertexai: true,
+        project: project!,
+        location: location
+      });
+    }
   }
   return _genai;
 }

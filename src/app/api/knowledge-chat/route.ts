@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateKnowledgeChatResponse, type KnowledgeChatInput } from '@/ai/flows/knowledge-chat';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     const body: KnowledgeChatInput = await request.json();
