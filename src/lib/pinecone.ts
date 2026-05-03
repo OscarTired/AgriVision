@@ -1,5 +1,7 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 import { GoogleGenAI } from '@google/genai';
+import fs from 'fs';
+import path from 'path';
 
 // ─── Singleton Pinecone client ───────────────────────────────────────────────
 let _pinecone: Pinecone | null = null;
@@ -35,21 +37,33 @@ function getGenAIClient(): GoogleGenAI {
   if (!_genai) {
     const project = process.env.GOOGLE_CLOUD_PROJECT;
     if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set');
-    const apiKey = process.env.GOOGLE_API_KEY;
-    if (!apiKey) throw new Error('GOOGLE_API_KEY is not set');
-    // vertexai: true + apiKey → Vertex AI Express Mode (sin ADC/gcloud, funciona en Vercel)
-    _genai = new GoogleGenAI({
+    
+    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+
+    // Soporte para Producción en Vercel:
+    // Si existe la variable con el JSON de la cuenta de servicio, la guardamos temporalmente en /tmp
+    if (process.env.GOOGLE_CREDENTIALS_JSON) {
+      const tempKeyPath = path.join('/tmp', 'gcp-key.json');
+      if (!fs.existsSync(tempKeyPath)) {
+        fs.writeFileSync(tempKeyPath, process.env.GOOGLE_CREDENTIALS_JSON);
+      }
+      // Le decimos al SDK de Google dónde está el archivo
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = tempKeyPath;
+    }
+
+    // Para desarrollo local, usará automáticamente tus credenciales de 'gcloud auth application-default login'
+    // En Vercel, usará el archivo que acabamos de crear en /tmp.
+    _genai = new GoogleGenAI({ 
       vertexai: true,
-      project,
-      location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
-      apiKey,
+      project: project,
+      location: location
     });
   }
   return _genai;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-// Mismo modelo usado en rag_pipeline.py para construir el índice → compatibilidad semántica garantizada
+
 const EMBEDDING_MODEL = 'gemini-embedding-2-preview';
 const EMBEDDING_DIMENSION = 768;
 const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'agrivision-rag';

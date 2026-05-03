@@ -14,6 +14,7 @@ import { MessageCircle, Calendar, Trash2, Eye, Stethoscope, CloudRain, User, Bot
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface ChatMessage {
   id: string;
@@ -28,6 +29,7 @@ interface ChatSession {
   messages: ChatMessage[];
   lastUpdated: string;
   title?: string;
+  messageCount?: number;
 }
 
 export default function HistoryPage() {
@@ -41,6 +43,23 @@ export default function HistoryPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const sendingRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { isPending } = useSession();
+
+  // Redirigir al usuario si cierra sesión
+  useEffect(() => {
+    if (!isPending && session === null) {
+      router.push('/');
+    }
+  }, [session, isPending, router]);
+
+  // Auto-scroll para los mensajes del chat
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedSession?.messages, sendingMessage]);
 
   useEffect(() => {
     // Solo cargar una vez al montar el componente
@@ -55,18 +74,18 @@ export default function HistoryPage() {
     
     try {
       setLoading(true);
-      console.log('🔍 [DEBUG] Cargando historial de chat...');
+      console.log('[DEBUG] Cargando historial de chat...');
       
       // Intentar cargar desde la API primero
       const response = await fetch('/api/chat-history?list=true', {
         cache: 'no-cache' // Evitar cache para obtener datos frescos
       });
-      console.log('🔍 [DEBUG] Respuesta de API:', response.status, response.statusText);
+      console.log('[DEBUG] Respuesta de API:', response.status, response.statusText);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('🔍 [DEBUG] Datos recibidos de API:', data);
-        console.log('🔍 [DEBUG] Número de sesiones:', data.sessions?.length || 0);
+        //console.log('[DEBUG] Datos recibidos de API:', data);
+        //console.log('[DEBUG] Número de sesiones:', data.sessions?.length || 0);
         setSessions(data.sessions || []);
       } else {
         console.error('Error loading chat history from API:', response.statusText);
@@ -89,7 +108,7 @@ export default function HistoryPage() {
     
     try {
       setLoadingMessages(true);
-      console.log('🔍 [DEBUG] Cargando mensajes para sesión:', sessionId, chatType);
+      //console.log('[DEBUG] Cargando mensajes para sesión:', sessionId, chatType);
       
       const response = await fetch(`/api/chat-history?type=${chatType}&sessionId=${sessionId}`, {
         cache: 'no-cache' // Evitar cache para obtener datos frescos
@@ -97,7 +116,7 @@ export default function HistoryPage() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('🔍 [DEBUG] Mensajes cargados:', data.messages?.length || 0);
+        console.log('[DEBUG] Mensajes cargados:', data.messages?.length || 0);
         return data.messages || [];
       } else {
         console.error('Error loading session messages:', response.statusText);
@@ -112,7 +131,7 @@ export default function HistoryPage() {
   };
 
   const handleSessionSelect = async (session: ChatSession) => {
-    console.log('🔍 [DEBUG] Seleccionando sesión:', session.id);
+    //console.log('[DEBUG] Seleccionando sesión:', session.id);
     
     // Evitar re-seleccionar la misma sesión
     if (selectedSession?.id === session.id) {
@@ -358,15 +377,15 @@ export default function HistoryPage() {
         messages: [...updatedSession.messages, assistantMessage],
         lastUpdated: new Date().toISOString()
       };
-      
       setSelectedSession(finalSession);
       
       // Actualizar la lista de sesiones
       setSessions(prev => prev.map(s => 
         s.id === selectedSession.id ? finalSession : s
       ));
-
-      // Guardar ambos mensajes en una sola llamada para evitar duplicaciones
+      
+      // Ocultar la animación de escribiendo inmediatamente antes de hacer fetch
+      setSendingMessage(false);
       try {
         console.log('🔍 [DEBUG] Guardando mensajes en historial...', {
           userMessageId: userMessage.id,
@@ -449,12 +468,12 @@ export default function HistoryPage() {
   // Removed authentication check - history now works for both authenticated and guest users
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 w-full max-w-full overflow-visible">
       <div className="mb-10 text-center flex flex-col items-center">
         <div className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center bg-background/50 backdrop-blur-md shadow-[0_0_15px_rgba(var(--primary),0.2)] animate-float-bio mb-4 stagger-item" style={{ animationDelay: '0ms' }}>
           <MessageCircle className="w-6 h-6 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
         </div>
-        <h1 className="text-4xl lg:text-5xl font-display font-bold mb-3 tracking-tight stagger-item" style={{ animationDelay: '50ms' }}>
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-3 tracking-tight stagger-item break-words max-w-full" style={{ animationDelay: '50ms' }}>
           Historial de <span className="text-iridescent">Conversaciones</span>
         </h1>
         <p className="text-muted-foreground font-body stagger-item" style={{ animationDelay: '50ms' }}>
@@ -462,10 +481,10 @@ export default function HistoryPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-full">
         {/* Lista de sesiones */}
-        <div className="lg:col-span-1">
-          <div className="relative bio-panel rounded-[2rem] p-1 overflow-hidden h-full card-hover">
+        <div className="lg:col-span-1 w-full min-w-0">
+          <div className="relative bio-panel rounded-[2rem] p-1 h-full">
             <div className="shimmer-bio" />
             <div className="relative bg-background/40 backdrop-blur-3xl rounded-[calc(2rem-4px)] h-full w-full">
           <Card className="bg-transparent border-0 shadow-none h-full">
@@ -477,14 +496,14 @@ export default function HistoryPage() {
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all" className="btn-press">Todas</TabsTrigger>
-                  <TabsTrigger value="diagnosis" className="btn-press">Diagnóstico</TabsTrigger>
-                  <TabsTrigger value="weather" className="btn-press">Clima</TabsTrigger>
-                  <TabsTrigger value="knowledge" className="btn-press">Conocimiento</TabsTrigger>
+                <TabsList className="grid grid-cols-2 sm:flex sm:flex-wrap w-full h-auto gap-2 bg-transparent p-0 mb-4">
+                  <TabsTrigger value="all" className="btn-press text-xs sm:text-sm h-9 data-[state=active]:bg-background data-[state=active]:shadow-sm">Todas</TabsTrigger>
+                  <TabsTrigger value="diagnosis" className="btn-press text-xs sm:text-sm h-9 data-[state=active]:bg-background data-[state=active]:shadow-sm">Diagnóstico</TabsTrigger>
+                  <TabsTrigger value="weather" className="btn-press text-xs sm:text-sm h-9 data-[state=active]:bg-background data-[state=active]:shadow-sm">Clima</TabsTrigger>
+                  <TabsTrigger value="knowledge" className="btn-press text-xs sm:text-sm h-9 data-[state=active]:bg-background data-[state=active]:shadow-sm">Conocimiento</TabsTrigger>
                 </TabsList>
                 
-                <div className="mt-4">
+                <div className="mt-2">
                   {loading ? (
                     <div className="text-center py-4">
                       <p className="text-muted-foreground">Cargando...</p>
@@ -492,23 +511,18 @@ export default function HistoryPage() {
                   ) : filteredSessions.length === 0 ? (
                     <div className="text-center py-4">
                       <p className="text-muted-foreground">No hay conversaciones</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Debug: {sessions.length} sesiones totales, {filteredSessions.length} filtradas
-                      </p>
                     </div>
                   ) : (
-                    <ScrollArea className="h-[400px]">
-                      <div className="space-y-2">
+                    <ScrollArea className="h-[400px] [&>div]:overflow-visible pr-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-1 gap-3 sm:gap-2">
                         {filteredSessions.map((session) => (
                           <Card 
                             key={session.id} 
-                            className={`cursor-pointer transition-all duration-normal hover:bg-muted/50 card-hover stagger-item ${
-                              selectedSession?.id === session.id ? 'ring-2 ring-primary shadow-md' : ''
-                            }`}
+                            className={`relative cursor-pointer transition-all duration-normal hover:bg-muted/50 stagger-item border-2 ${selectedSession?.id === session.id ? 'border-primary' : 'border-transparent'}`}
                             onClick={() => handleSessionSelect(session)}
                           >
                             <CardContent className="p-3">
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     {getChatTypeIcon(session.chatType)}
@@ -517,42 +531,40 @@ export default function HistoryPage() {
                                   <p className="text-sm font-medium font-display truncate">
                                     {session.title}
                                   </p>
-                                  <p className="text-xs text-muted-foreground font-body">
-                                    {format(new Date(session.lastUpdated), 'dd MMM yyyy, HH:mm', { locale: es })}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground font-body">
-                                    {session.messages.length} mensajes
+                                  <p className="text-xs text-muted-foreground font-body mt-1 truncate">
+                                    {format(new Date(session.lastUpdated), 'dd MMM yy, HH:mm', { locale: es })} · {session.messageCount ?? session.messages.length} msgs
                                   </p>
                                 </div>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive btn-press"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Esta acción no se puede deshacer. La conversación será eliminada permanentemente.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel className="btn-press">Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction 
-                                        onClick={() => deleteSession(session.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 btn-press"
+                                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive btn-press"
                                       >
-                                        Eliminar
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="max-w-[85vw] sm:max-w-lg rounded-lg p-4 sm:p-6">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción no se puede deshacer. La conversación será eliminada permanentemente.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel className="btn-press">Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => deleteSession(session.id)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90 btn-press"
+                                        >
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -569,8 +581,8 @@ export default function HistoryPage() {
         </div>
 
         {/* Detalle de la sesión */}
-        <div className="lg:col-span-2">
-          <div className="relative bio-panel rounded-[2rem] p-1 overflow-hidden h-full card-hover">
+        <div className="lg:col-span-2 w-full min-w-0">
+          <div className="relative bio-panel rounded-[2rem] p-1 h-full">
             <div className="shimmer-bio" style={{ animationDelay: '2s' }} />
             <div className="relative bg-background/40 backdrop-blur-3xl rounded-[calc(2rem-4px)] h-full w-full">
           <Card className="bg-transparent border-0 shadow-none h-full">
@@ -635,6 +647,30 @@ export default function HistoryPage() {
                         </p>
                       </div>
                     )}
+                    
+                    {/* Indicador de "Escribiendo..." */}
+                    {sendingMessage && (
+                      <div className="flex gap-3 animate-slide-in-left">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
+                            <Bot className="h-4 w-4 text-accent" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium font-display">AgriVision</span>
+                          </div>
+                          <div className="flex gap-1.5 mt-2 bg-muted/50 p-3 rounded-2xl rounded-tl-sm w-fit">
+                            <span className="w-2 h-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Elemento invisible para el auto-scroll */}
+                    <div ref={messagesEndRef} className="h-1" />
                   </div>
                 </ScrollArea>
               ) : (
@@ -654,7 +690,7 @@ export default function HistoryPage() {
                       placeholder="Escribe tu mensaje..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendChatMessage();

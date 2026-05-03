@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
     const userId = session?.user?.id || 'guest';
     
     // Debug logs
-    console.log('🔍 [API DEBUG] Session data:', session);
-    console.log('🔍 [API DEBUG] User ID:', userId);
-    console.log('🔍 [API DEBUG] User authenticated:', !!session?.user);
+    //console.log('[API DEBUG] Session data:', session);
+    //console.log('[API DEBUG] User ID:', userId);
+    console.log('[API DEBUG] User authenticated:', !!session?.user);
 
     const { searchParams } = new URL(request.url);
     const chatType = searchParams.get('type');
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     if (listSessions) {
       // Devolver lista de sesiones del usuario desde la base de datos
       try {
-        console.log('🔍 [API DEBUG] Consultando sesiones para userId:', userId);
+        //console.log('[API DEBUG] Consultando sesiones para userId:', userId);
         
         const result = await pool.query(`
           SELECT 
@@ -89,14 +89,15 @@ export async function GET(request: NextRequest) {
           ORDER BY last_updated DESC
         `, [userId]);
         
-        console.log('🔍 [API DEBUG] Resultados de la consulta:', result.rows.length, 'sesiones');
-        console.log('🔍 [API DEBUG] Datos:', result.rows);
+        console.log('[API DEBUG] Resultados de la consulta:', result.rows.length, 'sesiones');
+        //console.log('[API DEBUG] Datos:', result.rows);
         
         const sessions = result.rows.map(row => ({
           id: row.session_id,
           chatType: row.chat_type,
           lastUpdated: row.last_updated,
           title: row.first_message?.substring(0, 50) + '...' || `Sesión de ${row.chat_type}`,
+          messageCount: parseInt(row.message_count, 10) || 0,
           messages: [] // Se cargarán cuando se seleccione la sesión específica
         }));
         
@@ -150,28 +151,27 @@ export async function POST(request: NextRequest) {
     const { chatType, sessionId, role, content, contextData } = await request.json();
     
     // Debug logs
-    console.log('🔍 [POST API DEBUG] Recibiendo mensaje para guardar:');
-    console.log('🔍 [POST API DEBUG] Session:', session?.user ? 'Autenticado' : 'No autenticado');
-    console.log('🔍 [POST API DEBUG] chatType:', chatType);
-    console.log('🔍 [POST API DEBUG] sessionId:', sessionId);
-    console.log('🔍 [POST API DEBUG] role:', role);
-    console.log('🔍 [POST API DEBUG] content length:', content?.length);
+    console.log('[POST API DEBUG] Session:', session?.user ? 'Autenticado' : 'No autenticado');
+    //console.log('[POST API DEBUG] chatType:', chatType);
+    //console.log('[POST API DEBUG] sessionId:', sessionId);
+    //console.log('[POST API DEBUG] role:', role);
+    //console.log('[POST API DEBUG] content length:', content?.length);
     
     if (!chatType || !sessionId || !role || !content) {
-      console.log('🔍 [POST API DEBUG] Campos faltantes:', { chatType, sessionId, role, content: !!content });
+      console.log('[POST API DEBUG] Campos faltantes:', { chatType, sessionId, role, content: !!content });
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Usar el ID del usuario autenticado o 'guest' para usuarios no autenticados
     const userId = session?.user?.id || 'guest';
-    console.log('🔍 [POST API DEBUG] userId para guardar:', userId);
+    console.log('[POST API DEBUG] userId para guardar:', userId);
     
     // Crear nuevo mensaje y guardarlo en la base de datos
     const messageId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log('🔍 [POST API DEBUG] messageId generado:', messageId);
+    console.log('[POST API DEBUG] messageId generado:', messageId);
     
     try {
-      console.log('🔍 [POST API DEBUG] Ejecutando INSERT con parámetros:', {
+      console.log('[POST API DEBUG] Ejecutando INSERT con parámetros:', {
         messageId, userId, chatType, sessionId, role, contentLength: content.length
       });
       
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
         VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [messageId, userId, chatType, sessionId, role, content, contextData]);
       
-      console.log('🔍 [POST API DEBUG] Mensaje guardado exitosamente');
+      console.log('[POST API DEBUG] Mensaje guardado exitosamente');
       return NextResponse.json({ success: true, messageId });
     } catch (error) {
       console.error('Error saving message to database:', error);

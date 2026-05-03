@@ -1,0 +1,51 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.account (
+  id text NOT NULL,
+  accountId text NOT NULL,
+  providerId text NOT NULL,
+  userId text NOT NULL,
+  accessToken text,
+  refreshToken text,
+  idToken text,
+  accessTokenExpiresAt timestamp without time zone,
+  refreshTokenExpiresAt timestamp without time zone,
+  scope text,
+  password text,
+  createdAt timestamp without time zone NOT NULL DEFAULT now(),
+  updatedAt timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT account_pkey PRIMARY KEY (id),
+  CONSTRAINT account_userId_fkey FOREIGN KEY (userId) REFERENCES public.user(id)
+);
+CREATE TABLE public.session (
+  id text NOT NULL,
+  expiresAt timestamp without time zone NOT NULL,
+  token text NOT NULL UNIQUE,
+  createdAt timestamp without time zone NOT NULL DEFAULT now(),
+  updatedAt timestamp without time zone NOT NULL DEFAULT now(),
+  ipAddress text,
+  userAgent text,
+  userId text NOT NULL,
+  CONSTRAINT session_pkey PRIMARY KEY (id),
+  CONSTRAINT session_userId_fkey FOREIGN KEY (userId) REFERENCES public.user(id)
+);
+CREATE TABLE public.user (
+  id text NOT NULL,
+  name text NOT NULL,
+  email text NOT NULL UNIQUE,
+  emailVerified boolean NOT NULL DEFAULT false,
+  image text,
+  createdAt timestamp without time zone NOT NULL DEFAULT now(),
+  updatedAt timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.verification (
+  id text NOT NULL,
+  identifier text NOT NULL,
+  value text NOT NULL,
+  expiresAt timestamp without time zone NOT NULL,
+  createdAt timestamp without time zone DEFAULT now(),
+  updatedAt timestamp without time zone DEFAULT now(),
+  CONSTRAINT verification_pkey PRIMARY KEY (id)
+);

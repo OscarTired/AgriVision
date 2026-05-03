@@ -10,6 +10,9 @@ import { BookOpenText, CloudSun, Leaf, UserCircle, Moon, Sun } from 'lucide-reac
 import Image from 'next/image';
 import { UserBar } from '@/components/auth/UserBar';
 import { ThemeToggle } from '@/components/auth/theme-toggle';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { History } from 'lucide-react';
 
 const syne = Syne({
   variable: '--font-syne',
@@ -28,11 +31,15 @@ export const metadata: Metadata = {
   description: 'Smart Farming Solutions',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth.api.getSession({
+    headers: await headers()
+  });
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${syne.variable} ${outfit.variable} antialiased font-body bg-background text-foreground transition-colors duration-normal`} suppressHydrationWarning>
@@ -63,6 +70,18 @@ export default function RootLayout({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                
+                {session?.user && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Historial" className="btn-press transition-all duration-normal hover:translate-x-0.5">
+                      <Link href="/history">
+                        <History className="transition-all duration-normal group-hover:scale-110 group-hover:text-sidebar-primary" />
+                        <span>Historial</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Base de Conocimiento" className="btn-press transition-all duration-normal hover:translate-x-0.5">
                     <Link href="/knowledge">
