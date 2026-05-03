@@ -26,32 +26,8 @@ export async function buildRAGContext(
     console.log('[RAG] Raw results count:', results.length);
     console.log('[RAG] Raw results scores:', results.map(r => r.score));
 
-    // Filter by minimum relevance score
-    const relevant = results.filter((r) => r.score >= minScore);
-    console.log('[RAG] Filtered results (minScore=' + minScore + '):', relevant.length);
-
-    if (relevant.length === 0) {
-      console.log('[RAG] No relevant content found above threshold');
-      // Return top results even if below threshold for debugging
-      if (results.length > 0) {
-        console.log('[RAG] Returning top 3 results below threshold for debugging');
-        const topResults = results.slice(0, 3);
-        const contextBlocks = topResults.map((r, i) => {
-          const sourceLabel = formatSourceName(r.metadata.source);
-          return `[Fuente ${i + 1}: ${sourceLabel}, p.${r.metadata.page} (score: ${r.score.toFixed(3)})]\n${r.text.trim()}`;
-        });
-        const sources: RAGSource[] = topResults.map((r) => ({
-          source: formatSourceName(r.metadata.source),
-          page: r.metadata.page,
-          relevance: Math.round(r.score * 100),
-          snippet: r.text.substring(0, 150).trim() + (r.text.length > 150 ? '...' : ''),
-        }));
-        return {
-          context: contextBlocks.join('\n\n---\n\n'),
-          sources,
-          hasRelevantContent: true,
-        };
-      }
+    if (results.length === 0) {
+      console.log('[RAG] No results returned from vector search');
       return {
         context: '',
         sources: [],
@@ -59,8 +35,30 @@ export async function buildRAGContext(
       };
     }
 
+    const sortedResults = results
+      .filter((r) => r.text.trim().length > 0)
+      .sort((a, b) => b.score - a.score);
+
+    if (sortedResults.length === 0) {
+      console.log('[RAG] Results returned without usable text');
+      return {
+        context: '',
+        sources: [],
+        hasRelevantContent: false,
+      };
+    }
+
+    const bestScore = sortedResults[0]?.score ?? 0;
+    const relativeFloor = bestScore > 0 ? bestScore * 0.70 : 0;
+    const effectiveMinScore = Math.min(minScore, relativeFloor);
+    const relevant = sortedResults.filter((r) => r.score >= effectiveMinScore).slice(0, topK);
+    const selectedResults = relevant.length > 0 ? relevant : sortedResults.slice(0, Math.min(topK, 5));
+
+    console.log('[RAG] Effective minimum score:', effectiveMinScore);
+    console.log('[RAG] Selected results:', selectedResults.length);
+
     // Deduplicate by source + page (keep highest score)
-    const deduped = deduplicateResults(relevant);
+    const deduped = deduplicateResults(selectedResults).slice(0, topK);
 
     // Build context string
     const contextBlocks = deduped.map((r, i) => {
@@ -74,7 +72,7 @@ export async function buildRAGContext(
     const sources: RAGSource[] = deduped.map((r) => ({
       source: formatSourceName(r.metadata.source),
       page: r.metadata.page,
-      relevance: Math.round(r.score * 100),
+      relevance: normalizeRelevance(r.score, bestScore),
       snippet: r.text.substring(0, 150).trim() + (r.text.length > 150 ? '...' : ''),
     }));
 
@@ -118,4 +116,11 @@ function formatSourceName(source: string): string {
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeRelevance(score: number, bestScore: number): number {
+  if (bestScore <= 0) return 0;
+
+  const relativeScore = score / bestScore;
+  return Math.max(1, Math.min(100, Math.round(relativeScore * 100)));
 }

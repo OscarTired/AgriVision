@@ -2,117 +2,22 @@
 
 "use client";
 
-// Importación de componentes y estilos necesarios
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+// Importación de componentes y hooks necesarios
 import type { WeatherChatInput } from "@/ai/flows/weather-chat";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
-import { MapPin, Thermometer, Wind, Droplets, Sun, Cloud, CloudRain, CloudSnow, Zap, Loader2, WifiOff, Search, Calendar, Map, CloudDrizzle, Cloudy, SunMedium, CloudLightning, CloudFog, Snowflake, SunDim, ThermometerSun, ThermometerSnowflake, Volume2, VolumeX, MessageCircle, Send, type LucideIcon } from "lucide-react";
-import Image from "next/image";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { es } from "date-fns/locale";
-import dynamic from 'next/dynamic';
 import { usePersistentChat } from "@/hooks/use-persistent-chat";
-import { WeatherSkeleton } from "@/components/weather/WeatherSkeleton";
-import { WeatherForecastGrid } from "@/components/weather/WeatherForecastGrid";
-import { AIRecommendationsSection } from "@/components/weather/AIRecommendationsSection";
-
-// Importación del mapa de forma dinámica para evitar problemas de SSR
-const MapSelector = dynamic(() => import('../../components/MapSelector'), { 
-  ssr: false,
-  loading: () => <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">Cargando mapa...</div>
-});
-
-// Definición de interfaces para los datos del clima y pronóstico
-interface WeatherData {
-  location: string;
-  coordinates: { lat: number; lon: number };
-  temperature: number;
-  tempHigh: number;
-  tempLow: number;
-  condition: string;
-  humidity: number;
-  windSpeed: number;
-  windSpeedMin: number;
-  windSpeedMax: number;
-  icon: LucideIcon;
-  forecast: ForecastEntry[];
-  date: Date;
-}
-
-interface ForecastEntry {
-  date: string;
-  tempHigh: number;
-  tempLow: number;
-  condition: string;
-  icon: LucideIcon;
-  humidity: number;
-  windSpeed: number;
-  windSpeedMin: number;
-  windSpeedMax: number;
-}
-
-// Funciones para obtener el ícono del clima basado en el mapeo de código de Open-Meteo
-const getWeatherIcon = (weatherCode: number): LucideIcon => {
-  if (weatherCode === 0) return Sun; // Clear sky
-  if (weatherCode === 1) return SunDim; // Mainly clear
-  if (weatherCode === 2) return Cloudy; // Partly cloudy
-  if (weatherCode === 3) return Cloud; // Overcast
-  if (weatherCode === 45) return CloudFog; // Fog
-  if (weatherCode === 48) return Snowflake; // Fog with frost
-  if (weatherCode >= 51 && weatherCode <= 55) return CloudDrizzle; // Drizzle
-  if (weatherCode >= 61 && weatherCode <= 67) return CloudRain; // Rain
-  if (weatherCode >= 71 && weatherCode <= 86) return CloudSnow; // Snow
-  if (weatherCode === 95) return CloudLightning; // Thunderstorm
-  if (weatherCode === 96) return ThermometerSnowflake; // Thunderstorm with light hail
-  if (weatherCode === 99) return CloudLightning; // Thunderstorm with heavy hail
-  return Cloud; // Default
-};
-
-// Función para obtener la descripción del clima basada en el mapeo de código de Open-Meteo (en español)
-const getWeatherDescription = (weatherCode: number): string => {
-  const codes: { [key: number]: string } = {
-    0: "Cielo despejado",
-    1: "Principalmente despejado",
-    2: "Parcialmente nublado",
-    3: "Nublado",
-    45: "Niebla",
-    48: "Niebla con escarcha",
-    51: "Llovizna ligera",
-    53: "Llovizna moderada",
-    55: "Llovizna intensa",
-    61: "Lluvia ligera",
-    63: "Lluvia moderada",
-    65: "Lluvia intensa",
-    71: "Nieve ligera",
-    73: "Nieve moderada",
-    75: "Nieve intensa",
-    95: "Tormenta eléctrica",
-    96: "Tormenta con granizo ligero",
-    99: "Tormenta con granizo intenso"
-  };
-  return codes[weatherCode] || "Condiciones desconocidas";
-};
-
-// Función para obtener el ícono del termómetro basado en la temperatura promedio (tempLow y tempHigh)
-const getThermometerIcon = (tempLow: number, tempHigh: number): { icon: LucideIcon; color: string } => {
-  const avgTemp = (tempLow + tempHigh) / 2;
-  
-  if (avgTemp <= 0) {
-    return { icon: ThermometerSnowflake, color: "text-blue-600" };
-  } else if (avgTemp <= 10) {
-    return { icon: ThermometerSnowflake, color: "text-blue-400" };
-  } else if (avgTemp <= 20) {
-    return { icon: Thermometer, color: "text-primary" };
-  } else if (avgTemp <= 30) {
-    return { icon: ThermometerSun, color: "text-orange-500" };
-  } else {
-    return { icon: ThermometerSun, color: "text-red-600" };
-  }
-};
+import {
+  WeatherControlPanel,
+  WeatherDisplayCard,
+  WeatherChat,
+  WeatherSkeleton,
+  MapSelectorModal,
+  WeatherEmptyState,
+  WeatherError,
+  getWeatherIcon,
+  getWeatherDescription,
+  type WeatherData,
+} from "@/components/weather";
 
 // Estados para manejar el clima y la ubicación
 export default function WeatherPage() {
@@ -131,8 +36,7 @@ export default function WeatherPage() {
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lon: number } | null>(null);
   
   // Estados para selección de fecha
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   // Estados para funcionalidad de texto a voz con Web Speech API
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -140,7 +44,6 @@ export default function WeatherPage() {
   const [currentUtterance, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
 
   // Estados para el chat
-  const [showChat, setShowChat] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [reasoningSteps, setReasoningSteps] = useState<string[]>([]);
@@ -570,7 +473,7 @@ export default function WeatherPage() {
         });
         
         // Usar la ubicación obtenida por IP para buscar el clima
-        await fetchOpenMeteoWeather(data.latitude, data.longitude, selectedDate);
+        await fetchOpenMeteoWeather(data.latitude, data.longitude, selectedDate || undefined);
         setGettingLocation(false);
         setError(""); // Limpiar errores previos
         
@@ -643,7 +546,7 @@ export default function WeatherPage() {
         fetchOpenMeteoWeather(
           position.coords.latitude, 
           position.coords.longitude, 
-          selectedDate
+          selectedDate || undefined
         );
         setGettingLocation(false);
         setError(""); // Limpiar errores previos
@@ -710,7 +613,7 @@ export default function WeatherPage() {
       }
       
       const location = data.results[0];
-      await fetchOpenMeteoWeather(location.latitude, location.longitude, selectedDate);
+      await fetchOpenMeteoWeather(location.latitude, location.longitude, selectedDate || undefined);
       
     } catch (err: any) {
       setError(err.message);
@@ -722,14 +625,13 @@ export default function WeatherPage() {
   const handleMapLocationSelect = (coords: { lat: number; lon: number }) => {
     setSelectedCoords(coords);
     setShowMapSelector(false);
-    fetchOpenMeteoWeather(coords.lat, coords.lon, selectedDate);
+    fetchOpenMeteoWeather(coords.lat, coords.lon, selectedDate || undefined);
   };
 
   // Manejar el cambio de fecha en el selector
   const handleDateChange = (date: Date | null) => {
     if (date) {
       setSelectedDate(date);
-      setShowDatePicker(false);
       
       // Si ya tenemos coordenadas, volver a buscar con la nueva fecha
       if (weather?.coordinates) {
@@ -747,396 +649,56 @@ export default function WeatherPage() {
       <div className="absolute bottom-40 left-1/4 w-24 h-24 rounded-full bg-primary/5 blur-2xl animate-pulse-subtle" style={{animationDelay: '2s'}} />
       
       <div className="container mx-auto py-8 lg:py-12 relative z-10 space-y-8">
-      {/* Panel de controles */}
-      <div className="relative z-50 stagger-item">
-        <div className="relative bio-panel rounded-[2rem] p-1 overflow-visible card-hover">
-          <div className="shimmer-bio" style={{ borderRadius: 'inherit' }} />
-          <div className="relative bg-background/40 backdrop-blur-3xl rounded-[calc(2rem-4px)] h-full w-full overflow-visible">
-        <Card className="bg-transparent border-0 shadow-none relative overflow-visible">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold flex items-center gap-3 animate-slide-down-fade font-display">
-            <div className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center bg-background/50 backdrop-blur-md shadow-[0_0_15px_rgba(var(--primary),0.2)] animate-float-bio">
-              <MapPin className="w-6 h-6 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
-            </div>
-            <span className="text-iridescent">Análisis Climático</span>
-          </CardTitle>
-          <CardDescription className="animate-fade-in" style={{ animationDelay: '100ms' }}>
-            Selecciona una ubicación y fecha para ver el pronóstico del clima
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-2">
-          {/* Main search and date row */}
-          <div className="flex flex-col md:flex-row gap-4 items-end stagger-item relative z-50 w-full" style={{ animationDelay: '150ms' }}>
-            {/* Búsqueda manual (Principal) */}
-            <div className="flex-1 space-y-2 w-full min-w-0">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Buscar por ciudad</Label>
-              <div className="relative group max-w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input
-                  placeholder="Ej: Lima, Perú o Santiago, Chile"
-                  value={manualLocation}
-                  onChange={(e) => setManualLocation(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleManualLocationSearch()}
-                  className="pl-10 pr-24 h-12 text-base input-focus-ring bg-background shadow-sm border-border/60 rounded-xl w-full block"
-                />
-                <Button 
-                  onClick={handleManualLocationSearch} 
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-10 px-4 btn-press rounded-lg"
-                  disabled={loading}
-                >
-                  Buscar
-                </Button>
-              </div>
-            </div>
+        {/* Panel de controles */}
+        <WeatherControlPanel
+          manualLocation={manualLocation}
+          onManualLocationChange={setManualLocation}
+          onManualLocationSearch={handleManualLocationSearch}
+          selectedDate={selectedDate}
+          onDateChange={handleDateChange}
+          gettingLocation={gettingLocation}
+          onGetLocationClick={handleGetLocationClick}
+          onShowMapSelector={() => setShowMapSelector(true)}
+          loading={loading}
+        />
 
-            {/* Selector de Fecha */}
-            <div className="space-y-2 relative w-full md:w-auto">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fecha de consulta</Label>
-              <Button
-                variant="outline"
-                onClick={() => setShowDatePicker(!showDatePicker)}
-                className="h-12 w-full md:w-48 px-4 flex items-center justify-between border-border/60 shadow-sm bg-background hover:bg-muted/50 btn-press rounded-xl"
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-foreground">{selectedDate.toLocaleDateString('es-ES')}</span>
-                </div>
-              </Button>
-              {showDatePicker && (
-                <>
-                  {/* Backdrop for mobile */}
-                  <div
-                    className="fixed inset-0 z-[9998] bg-black/30 backdrop-blur-sm sm:hidden animate-fade-in"
-                    onClick={() => setShowDatePicker(false)}
-                  />
-                  <div className="fixed inset-x-4 bottom-4 z-[9999] sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-[calc(100%+0.5rem)] sm:right-0 sm:left-auto bg-background border border-border/60 rounded-xl shadow-2xl animate-scale-in origin-top sm:origin-top-right overflow-hidden flex justify-center">
-                    <DatePicker
-                      selected={selectedDate}
-                      onChange={handleDateChange}
-                      minDate={new Date(2020, 0, 1)}
-                      maxDate={new Date(Date.now() + 16 * 24 * 60 * 60 * 1000)}
-                      inline
-                      locale={es}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+        {/* Selector de mapa en modal */}
+        <MapSelectorModal
+          open={showMapSelector}
+          onClose={() => setShowMapSelector(false)}
+          onLocationSelect={handleMapLocationSelect}
+        />
 
-          <div className="flex items-center gap-4 text-sm text-muted-foreground stagger-item" style={{ animationDelay: '200ms' }}>
-            <div className="flex-1 h-px bg-border/40"></div>
-            <span className="uppercase text-[10px] font-bold tracking-widest text-muted-foreground/70">o elige otro método</span>
-            <div className="flex-1 h-px bg-border/40"></div>
-          </div>
+        {/* Mostrar error */}
+        {error && <WeatherError error={error} />}
 
-          {/* Opciones de ubicación alternativas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-item" style={{ animationDelay: '250ms' }}>
-            {/* Ubicación actual (GPS) */}
-            <Button
-              variant="outline"
-              onClick={handleGetLocationClick}
-              disabled={gettingLocation}
-              className="h-auto py-3 px-4 flex items-center justify-start gap-4 border-border/60 bg-background shadow-sm hover:border-primary/40 hover:bg-primary/5 btn-press group transition-all rounded-xl"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-normal shrink-0">
-                {gettingLocation ? (
-                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                ) : (
-                  <MapPin className="w-5 h-5 text-primary" />
-                )}
-              </div>
-              <div className="text-left">
-                <div className="font-semibold text-foreground text-sm">
-                  {gettingLocation ? "Obteniendo..." : "Usar mi ubicación GPS"}
-                </div>
-                <div className="text-xs text-muted-foreground">Alta precisión</div>
-              </div>
-            </Button>
-
-            {/* Selección en mapa */}
-            <Button
-              variant="outline"
-              onClick={() => setShowMapSelector(true)}
-              className="h-auto py-3 px-4 flex items-center justify-start gap-4 border-border/60 bg-background shadow-sm hover:border-accent/40 hover:bg-accent/5 btn-press group transition-all rounded-xl"
-            >
-              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 group-hover:scale-110 transition-all duration-normal shrink-0">
-                <Map className="w-5 h-5 text-accent" />
-              </div>
-              <div className="text-left">
-                <div className="font-semibold text-foreground text-sm">Seleccionar en el mapa</div>
-                <div className="text-xs text-muted-foreground">Búsqueda visual interactiva</div>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-        </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Selector de mapa en modal */}
-      {showMapSelector && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[99999] animate-fade-in" style={{position: 'fixed', inset: 0, width: '100vw', height: '100vh', padding: 0, margin: 0}}>
-<div className="bg-background rounded-2xl shadow-2xl w-full max-w-4xl mx-4 sm:mx-8 flex flex-col relative animate-scale-in border border-border/50" style={{height: 'auto', maxHeight: '70vh', minHeight: '500px'}}>
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-border/40 flex-shrink-0 bg-muted/20 rounded-t-2xl">
-              <h3 className="text-lg sm:text-xl font-display font-semibold text-foreground flex items-center gap-2">
-                <Map className="w-5 h-5 text-accent" /> Selecciona una ubicación
-              </h3>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowMapSelector(false)}
-                className="hover:bg-gray-100 shrink-0"
-                size="sm"
-              >
-                Cerrar
-              </Button>
-            </div>
-            <div className="flex-1 p-2 sm:p-6 overflow-hidden">
-<div className="h-full w-full" style={{height: '400px', minHeight: '300px', maxHeight: 'calc(70vh - 120px)'}}>
-                <MapSelector onLocationSelect={handleMapLocationSelect} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mostrar error */}
-      {error && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg animate-scale-in">
-          <p className="font-bold font-display">Error:</p>
-          <p className="font-body text-sm mt-1">{error}</p>
-        </div>
-      )}
-
-      {/* Datos del clima */}
-      {loading ? (
-        /* Skeleton mientras cargan los datos del clima */
-        <WeatherSkeleton />
-      ) : weather ? (
-        <div className="relative bio-panel rounded-[2rem] p-1 overflow-hidden">
-          <div className="shimmer-bio" style={{ animationDelay: '2s' }} />
-          <div className="relative bg-background/40 backdrop-blur-3xl rounded-[calc(2rem-4px)] h-full w-full">
-        <Card className="shadow-xl overflow-hidden border-0 bg-transparent shadow-none">
-          <CardHeader className="bg-gradient-to-br from-primary to-accent text-primary-foreground p-6 bg-[length:200%_200%] animate-gradient-shift" style={{ animationDuration: '8s' }}>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-3xl font-bold flex items-center gap-2">
-                  <MapPin className="w-7 h-7" />
-                  {weather.location}
-                </CardTitle>
-                <CardDescription className="text-primary-foreground/80 mt-1">
-                  {weather.date.toLocaleDateString('es-ES', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </CardDescription>
-              </div>
-              <weather.icon className="w-16 h-16 opacity-80" />
-            </div>
-          </CardHeader>
-          
-          <CardContent className="p-6 space-y-8">
-            {/* Condiciones actuales */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-              <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg stagger-item card-hover">
-                {(() => {
-                  const { icon: ThermometerIcon, color } = getThermometerIcon(weather.tempLow, weather.tempHigh);
-                  return <ThermometerIcon className={`w-10 h-10 ${color} mb-2 transition-transform duration-normal hover:scale-110`} />;
-                })()}
-                <p className="text-3xl font-bold">{weather.tempLow}°C - {weather.tempHigh}°C</p>
-                <p className="text-muted-foreground">Temperatura</p>
-              </div>
-              <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg stagger-item card-hover">
-                <Droplets className="w-10 h-10 text-blue-500 mb-2 transition-transform duration-normal hover:scale-110" />
-                <p className="text-3xl font-bold">{weather.humidity}%</p>
-                <p className="text-muted-foreground">Humedad</p>
-              </div>
-              <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg stagger-item card-hover">
-                <Wind className="w-10 h-10 text-gray-500 mb-2 transition-transform duration-normal hover:scale-110" />
-                <p className="text-3xl font-bold">{weather.windSpeedMin} - {weather.windSpeedMax} km/h</p>
-                <p className="text-muted-foreground">Viento</p>
-              </div>
-            </div>
-
-            <div className="text-center p-4 bg-primary/10 rounded-lg">
-              <p className="text-lg font-medium">{weather.condition}</p>
-            </div>
-
-            {/* Pronóstico de 7 días */}
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Pronóstico de 7 días</h3>
-              <WeatherForecastGrid forecast={weather.forecast} />
-            </div>
-            {/* Recomendaciones Agrícolas (IA) */}
-            <div>
-              <AIRecommendationsSection
-                loading={loadingRecommendations}
-                recommendations={recommendations}
-              />
-            </div>
-
+        {/* Datos del clima */}
+        {loading ? (
+          <WeatherSkeleton />
+        ) : weather ? (
+          <WeatherDisplayCard
+            weather={weather}
+            loadingRecommendations={loadingRecommendations}
+            recommendations={recommendations}
+          >
             {/* Chat con Gemini */}
             {recommendations && (
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold">Chat Agrícola</h3>
-                  <Button
-                    onClick={() => setShowChat(!showChat)}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    {showChat ? 'Ocultar Chat' : 'Abrir Chat'}
-                  </Button>
-                </div>
-                
-                <div className={`grid transition-all duration-300 ease-in-out ${showChat ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden">
-                    <Card className="border border-border/60 shadow-md mt-2">
-                      <CardContent className="p-4">
-                      {/* Área de mensajes */}
-                      <div className="h-64 overflow-y-auto mb-4 p-3 bg-muted/50 rounded-lg">
-                        {chatMessages.length === 0 ? (
-                          <div className="text-center text-muted-foreground mt-20">
-                            <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50 animate-float" style={{ animationDuration: '3s' }} />
-                            <p className="font-body text-sm">¡Hola! Puedes preguntarme cualquier cosa sobre las recomendaciones climáticas o agricultura en general.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {chatMessages.map((message, index) => (
-                              <div
-                                key={index}
-                                className={`flex ${
-                                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                                }`}
-                              >
-                                <div
-                                  className={`max-w-[80%] p-3 ${
-                                    message.role === 'user'
-                                      ? 'bg-primary text-primary-foreground chat-bubble-user'
-                                      : 'bg-card border border-border/60 shadow-sm chat-bubble-assistant'
-                                  }`}
-                                >
-                                  <p className="text-sm whitespace-pre-wrap font-body">{message.content}</p>
-                                </div>
-                              </div>
-                            ))}
-                            {/* Pasos de razonamiento animados */}
-                            {isSendingMessage && reasoningSteps.length > 0 && (
-                              <div className="flex justify-start chat-msg-enter">
-                                <div className="bg-card border border-border p-3 rounded-lg shadow-sm max-w-[90%]">
-                                  <div className="flex items-start gap-3">
-                                    <div className="relative mt-0.5">
-                                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                    </div>
-                                    <div className="space-y-1.5 min-w-[200px]">
-                                      {reasoningSteps.map((step, idx) => (
-                                        <div
-                                          key={idx}
-                                          className={`text-sm font-body transition-all duration-700 ${
-                                            idx === currentStepIndex
-                                              ? 'text-foreground opacity-100 translate-x-0'
-                                              : idx < currentStepIndex
-                                              ? 'text-muted-foreground/60 opacity-60 translate-x-1'
-                                              : 'text-muted-foreground/30 opacity-30 -translate-x-1'
-                                          }`}
-                                        >
-                                          <span className="inline-flex items-center gap-2">
-                                            {idx < currentStepIndex && (
-                                              <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                                            )}
-                                            {idx === currentStepIndex && (
-                                              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                                            )}
-                                            {idx > currentStepIndex && (
-                                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
-                                            )}
-                                            {step}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            {/* Fallback loading state */}
-                            {(chatLoading && !isSendingMessage) && (
-                              <div className="flex justify-start chat-msg-enter">
-                                <div className="bg-card border border-border p-3 rounded-lg shadow-sm">
-                                  <div className="flex items-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                    <span className="text-sm text-muted-foreground font-body">Cargando...</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Input para escribir mensajes */}
-                      <div className="flex gap-2">
-                        <Input
-                          value={chatInput}
-                          onChange={(e) => setChatInput(e.target.value)}
-                          onKeyPress={handleChatKeyPress}
-                          placeholder="Escribe tu pregunta sobre agricultura o clima..."
-                          disabled={isSendingMessage}
-                          className="flex-1 font-body input-focus-ring min-w-0"
-                        />
-                        <Button
-                          onClick={handleSendMessage}
-                          disabled={!chatInput.trim() || isSendingMessage}
-                          size="sm"
-                          className="px-3 btn-press transition-all duration-normal flex-shrink-0"
-                        >
-                          {isSendingMessage ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4 transition-transform duration-normal group-hover:translate-x-0.5" />
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  </div>
-                </div>
-              </div>
+              <WeatherChat
+                chatMessages={chatMessages}
+                chatLoading={chatLoading}
+                isSendingMessage={isSendingMessage}
+                chatInput={chatInput}
+                onChatInputChange={setChatInput}
+                onSendMessage={handleSendMessage}
+                onKeyPress={handleChatKeyPress}
+                reasoningSteps={reasoningSteps}
+                currentStepIndex={currentStepIndex}
+              />
             )}
-            {/* Mensaje de aviso */}
-            <p className="text-xs text-muted-foreground text-center">
-              Powered by Open-Meteo API
-            </p>
-          </CardContent>
-        </Card>
-          </div>
-        </div>
-      ) : (
-        <div className="relative bio-panel rounded-[2rem] p-1 overflow-hidden card-hover">
-          <div className="shimmer-bio" style={{ animationDelay: '2s' }} />
-          <div className="relative bg-background/40 backdrop-blur-3xl rounded-[calc(2rem-4px)] h-full w-full">
-        <Card className="shadow-lg bg-transparent border-0">
-          <CardContent className="flex flex-col items-center justify-center text-center py-16">
-            <WifiOff className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Sin datos del clima</h3>
-            <p className="text-muted-foreground">
-              Selecciona una ubicación para cargar los datos del clima
-            </p>
-
-            {/* Mensaje de aviso */}
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              Powered by Open-Meteo API
-            </p>
-          </CardContent>
-        </Card>
-          </div>
-        </div>
-      )}
+          </WeatherDisplayCard>
+        ) : (
+          <WeatherEmptyState />
+        )}
       </div>
     </div>
   );

@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button';
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarRail, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { ThemeProvider } from 'next-themes';
-import { BookOpenText, CloudSun, Leaf, UserCircle, Moon, Sun } from 'lucide-react';
+import { BookOpenText, CloudSun, Leaf, UserCircle, Moon, Sun, History, Shield } from 'lucide-react';
 import Image from 'next/image';
 import { UserBar } from '@/components/auth/UserBar';
 import { ThemeToggle } from '@/components/auth/theme-toggle';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
-import { History } from 'lucide-react';
 
 const syne = Syne({
   variable: '--font-syne',
@@ -95,6 +94,14 @@ export default async function RootLayout({
                     <Link href="/profile">
                       <UserCircle className="transition-all duration-normal group-hover:scale-110 group-hover:text-sidebar-primary" />
                       <span>Perfil</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Privacidad" className="btn-press transition-all duration-normal hover:translate-x-0.5">
+                    <Link href="/privacy">
+                      <Shield className="transition-all duration-normal group-hover:scale-110 group-hover:text-sidebar-primary" />
+                      <span>Privacidad</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

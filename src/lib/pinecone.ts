@@ -35,9 +35,8 @@ let _genai: GoogleGenAI | null = null;
 
 function getGenAIClient(): GoogleGenAI {
   if (!_genai) {
-    const apiKey = process.env.GOOGLE_API_KEY;
     const project = process.env.GOOGLE_CLOUD_PROJECT;
-    if (!apiKey && !project) throw new Error('GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT is not set');
+    if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set');
     
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
 
@@ -52,24 +51,18 @@ function getGenAIClient(): GoogleGenAI {
       process.env.GOOGLE_APPLICATION_CREDENTIALS = tempKeyPath;
     }
 
-    if (apiKey) {
-      _genai = new GoogleGenAI({
-        apiKey,
-      });
-    } else {
-      _genai = new GoogleGenAI({ 
-        vertexai: true,
-        project: project!,
-        location: location
-      });
-    }
+    _genai = new GoogleGenAI({ 
+      vertexai: true,
+      project: project,
+      location: location
+    });
   }
   return _genai;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const EMBEDDING_MODEL = 'gemini-embedding-2-preview';
+const EMBEDDING_MODEL = 'text-embedding-004';
 const EMBEDDING_DIMENSION = 768;
 const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'agrivision-rag';
 const NAMESPACE = 'agrivision-docs';
@@ -126,11 +119,12 @@ export async function queryRAG(
 
   const results = await index.namespace(NAMESPACE).query(queryParams);
   console.log('[Pinecone] Query returned', results.matches?.length || 0, 'matches');
+  console.log('[Pinecone] First match metadata keys:', Object.keys(results.matches?.[0]?.metadata || {}));
 
   return (results.matches || []).map((match) => ({
     id: match.id,
     score: match.score || 0,
-    text: (match.metadata?.text as string) || '',
+    text: extractTextFromMetadata(match.metadata),
     metadata: {
       source: (match.metadata?.source as string) || '',
       page: (match.metadata?.page as number) || 0,
@@ -139,4 +133,35 @@ export async function queryRAG(
       ...match.metadata,
     },
   }));
+}
+
+function extractTextFromMetadata(metadata: Record<string, unknown> | undefined): string {
+  if (!metadata) return '';
+
+  const candidateKeys = [
+    'text',
+    'content',
+    'chunk',
+    'chunk_text',
+    'pageContent',
+    'page_content',
+    'raw_text',
+    'document',
+    'body',
+    'content_text',
+    'text_content',
+  ];
+
+  for (const key of candidateKeys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+
+  const fallback = Object.values(metadata).find(
+    (value) => typeof value === 'string' && value.trim().length > 80
+  );
+
+  if (typeof fallback === 'string') return fallback;
+
+  return '';
 }
