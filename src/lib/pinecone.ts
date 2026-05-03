@@ -54,9 +54,7 @@ function getGenAIClient(): GoogleGenAI {
 
     if (apiKey) {
       _genai = new GoogleGenAI({
-        vertexai: true,
         apiKey,
-        location,
       });
     } else {
       _genai = new GoogleGenAI({ 
