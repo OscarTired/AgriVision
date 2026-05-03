@@ -41,7 +41,7 @@ export default function RootLayout({
           <Sidebar variant="sidebar" collapsible="icon">
             <SidebarHeader className="py-3 px-3">
               <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-                <Image src="/agrivision-logo.svg" alt="AgriVision Logo" width={28} height={28} className="transition-transform duration-normal hover:scale-110 animate-float" style={{ animationDuration: '4s' }} data-ai-hint="logo agriculture" />
+                <Image src="/agrivision.png" alt="AgriVision Logo" width={60} height={60} className="transition-transform duration-normal hover:scale-110" data-ai-hint="logo agriculture" />
                 <h1 className="text-xl font-display font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden transition-opacity duration-normal">AgriVision</h1>
               </Link>
             </SidebarHeader>

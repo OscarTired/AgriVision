@@ -1,4 +1,5 @@
 "use client";
+import React, { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -31,6 +32,8 @@ export function DiagnosisForm({
   handleGetLocation,
   hasLocation,
 }: DiagnosisFormProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 min-w-0 w-full">
@@ -54,10 +57,42 @@ export function DiagnosisForm({
                   {!imagePreview ? (
                     <label
                       htmlFor="dropzone-file"
-                      className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-card group overflow-hidden"
+                      className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer group overflow-hidden transition-all duration-300 ${
+                        isDragging 
+                          ? 'border-primary bg-primary/5 scale-[1.02]' 
+                          : 'border-border bg-card hover:bg-muted/30'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragging(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        
+                        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                          const fileList = e.dataTransfer.files;
+                          
+                          // Validar que sea imagen
+                          if (!fileList[0].type.startsWith('image/')) return;
+                          
+                          // Update form hook
+                          onChange(fileList);
+                          
+                          // Trigger original image handler with mock event
+                          const mockEvent = {
+                            target: { files: fileList }
+                          } as React.ChangeEvent<HTMLInputElement>;
+                          handleImageChange(mockEvent);
+                        }
+                      }}
                     >
                       <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
-                        <UploadCloud className="w-10 h-10 mb-3 text-muted-foreground group-hover:scale-110 group-hover:text-primary transition-all duration-normal animate-float" style={{ animationDuration: '3s' }} />
+                        <UploadCloud className={`w-10 h-10 mb-3 transition-all duration-300 ${isDragging ? 'text-primary scale-125' : 'text-muted-foreground group-hover:scale-110 group-hover:text-primary'} animate-float`} style={{ animationDuration: '3s' }} />
                         <p className="mb-2 text-sm text-muted-foreground text-center font-body">
                           <span className="font-semibold">Haga clic para subir</span> o arrastre y suelte
                         </p>

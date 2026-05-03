@@ -256,8 +256,9 @@ export function DiagnosisPlantScene(props: DiagnosisPlantSceneProps) {
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
       }} />
 
-      {/* Live badge — glassmorphism */}
-      <div className="pointer-events-none absolute left-4 top-4 z-10">
+      {/* Top badges container */}
+      <div className="pointer-events-none absolute top-4 inset-x-4 z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        {/* Live badge — glassmorphism */}
         <div className="rounded-xl border border-primary/20 bg-background/70 px-3.5 py-2 text-xs font-semibold text-primary shadow-lg backdrop-blur-xl flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
@@ -265,10 +266,8 @@ export function DiagnosisPlantScene(props: DiagnosisPlantSceneProps) {
           </span>
           Ecosistema 3D
         </div>
-      </div>
 
-      {/* Stage indicator — animated glassmorphism */}
-      <div className="pointer-events-none absolute right-4 top-4 z-10">
+        {/* Stage indicator — animated glassmorphism */}
         <div className={`rounded-xl border border-border/30 bg-background/70 px-3.5 py-2 text-xs font-semibold shadow-lg backdrop-blur-xl flex items-center gap-2 transition-all duration-500 ${stageInfo.color}`}>
           <StageIcon className="w-3.5 h-3.5" />
           {stageInfo.text}
