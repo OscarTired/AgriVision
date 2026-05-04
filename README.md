@@ -1,10 +1,12 @@
-# AgriVision
+<div style="text-align: center;">
+    <h1>AgriVision</h1>
 
 ![Next.js](https://img.shields.io/badge/Next.js-Black?style=flat-square&logo=next.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
 ![Google Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=flat-square&logo=google&logoColor=white)
 ![Pinecone](https://img.shields.io/badge/Pinecone-000000?style=flat-square&logo=pinecone&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
+</div>
 
 AgriVision is an intelligent agricultural dashboard designed to help farmers and agronomists make data-driven decisions. By combining real-time weather forecasting with AI-powered agricultural recommendations, it provides actionable insights tailored to specific locations and crop conditions.
 
