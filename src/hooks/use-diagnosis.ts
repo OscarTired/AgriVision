@@ -94,6 +94,55 @@ const getPreferredSpanishVoice = () => {
   return voices.find(voice => voice.lang.startsWith('es')) ?? null;
 };
 
+// ─── Image compression helper ────────────────────────────────────────
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1024;
+        const MAX_HEIGHT = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height *= MAX_WIDTH / width));
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width *= MAX_HEIGHT / height));
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("No se pudo obtener el contexto del canvas"));
+          return;
+        }
+        
+        ctx.fillStyle = "#FFFFFF"; // Fondo blanco para transparencia si era png/webp
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Forzamos formato JPEG con compresión 0.8 para máxima compatibilidad con Gemini
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(new Error("Error al cargar la imagen para compresión"));
+    };
+    reader.onerror = (err) => reject(new Error("Error al leer el archivo"));
+  });
+};
+
 // ─── Hook ──────────────────────────────────────────────────────────
 export function useDiagnosis(sessionId?: string) {
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnoseCropDiseaseOutput | null>(null);
@@ -385,68 +434,65 @@ export function useDiagnosis(sessionId?: string) {
     setShowWeatherModel(false);
 
     const file = data.cropImage[0];
-    const reader = new FileReader();
 
-    reader.onloadend = async () => {
-      try {
-        const imageDataUri = reader.result as string;
+    try {
+      // compresión de imagen
+      const imageDataUri = await compressImage(file);
 
-        setPlantStage('weather');
-        setShowWeatherModel(true);
-        const weatherData = await fetchOpenMeteoWeather(location.lat, location.lon);
-        setShowWeatherModel(false);
-        setPlantStage('growing');
+      setPlantStage('weather');
+      setShowWeatherModel(true);
+      const weatherData = await fetchOpenMeteoWeather(location.lat, location.lon);
+      setShowWeatherModel(false);
+      setPlantStage('growing');
 
-        if (!weatherData?.location || !weatherData?.coordinates) {
-          throw new Error('Datos climáticos incompletos recibidos');
-        }
-        setLastWeatherData(weatherData);
-
-        const input: DiagnoseCropDiseaseInput = {
-          cropImage: imageDataUri,
-          weatherData: {
-            location: weatherData.location,
-            coordinates: weatherData.coordinates,
-            temperature: weatherData.temperature,
-            tempHigh: weatherData.tempHigh,
-            tempLow: weatherData.tempLow,
-            condition: weatherData.condition,
-            humidity: weatherData.humidity,
-            windSpeed: weatherData.windSpeed,
-            windSpeedMin: weatherData.windSpeedMin,
-            windSpeedMax: weatherData.windSpeedMax,
-            icon: weatherData.icon,
-          },
-          date: new Date().toISOString(),
-        };
-
-        const response = await fetch('/api/diagnosis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        });
-
-        if (!response.ok) throw new Error('Failed to get diagnosis');
-        const result = await response.json();
-        setDiagnosisResult(result);
-
-        if (result.plantIdentification?.isRaspberry === false || result.confidence === 0) {
-          setPlantStage('wilted');
-        } else {
-          setPlantStage('healthy');
-          setGrowthProgress(1);
-        }
-        toast({ title: "Diagnóstico Completo", description: "La IA ha analizado su imagen del cultivo.", variant: "default" });
-      } catch (err: any) {
-        setError(`Error al realizar el diagnóstico: ${err.message}`);
-        setPlantStage('wilted');
-        setShowWeatherModel(false);
-        toast({ title: "Error en el Diagnóstico", description: err.message, variant: "destructive" });
-      } finally {
-        setIsLoading(false);
+      if (!weatherData?.location || !weatherData?.coordinates) {
+        throw new Error('Datos climáticos incompletos recibidos');
       }
-    };
-    reader.readAsDataURL(file);
+      setLastWeatherData(weatherData);
+
+      const input: DiagnoseCropDiseaseInput = {
+        cropImage: imageDataUri,
+        weatherData: {
+          location: weatherData.location,
+          coordinates: weatherData.coordinates,
+          temperature: weatherData.temperature,
+          tempHigh: weatherData.tempHigh,
+          tempLow: weatherData.tempLow,
+          condition: weatherData.condition,
+          humidity: weatherData.humidity,
+          windSpeed: weatherData.windSpeed,
+          windSpeedMin: weatherData.windSpeedMin,
+          windSpeedMax: weatherData.windSpeedMax,
+          icon: weatherData.icon,
+        },
+        date: new Date().toISOString(),
+      };
+
+      const response = await fetch('/api/diagnosis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) throw new Error('Failed to get diagnosis');
+      const result = await response.json();
+      setDiagnosisResult(result);
+
+      if (result.plantIdentification?.isRaspberry === false || result.confidence === 0) {
+        setPlantStage('wilted');
+      } else {
+        setPlantStage('healthy');
+        setGrowthProgress(1);
+      }
+      toast({ title: "Diagnóstico Completo", description: "La IA ha analizado su imagen del cultivo.", variant: "default" });
+    } catch (err: any) {
+      setError(`Error al realizar el diagnóstico: ${err.message}`);
+      setPlantStage('wilted');
+      setShowWeatherModel(false);
+      toast({ title: "Error en el Diagnóstico", description: err.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return {
